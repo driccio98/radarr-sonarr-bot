@@ -1,10 +1,7 @@
-const axios = require("axios");
-const { Markup } = require("telegraf");
-const { v4: uuid } = require('uuid');
-
-function escapeRegExp(text) {
-    return text.replace(/[-[\]{}()*+?.,!\\^$|#]/g, "\\$&");
-}
+import axios from "axios";
+import { Markup } from "telegraf";
+import { v4 as uuid } from 'uuid';
+import escapeRegExp from "./utils/EscapeString.js";
 
 export async function handleSearch(searchTerm) {
     if (searchTerm && searchTerm.length > 0) {
@@ -16,7 +13,7 @@ export async function handleSearch(searchTerm) {
         results.map((movieObject) => {
 
             //When movies are not in the database they have no id;
-            if(!movieObject.id){ movieObject.id = uuid(); } 
+            if (!movieObject.id) { movieObject.id = uuid(); }
 
             let monitoringButton;
             if (movieObject.monitored) {
@@ -34,18 +31,26 @@ export async function handleSearch(searchTerm) {
             movies.push({
                 id: movieObject.id,
                 photo: movieObject.remotePoster || "",
-                caption: `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_\nDescription: ${escapeRegExp(movieObject.overview)}`,
+                caption: `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`,
                 ...Markup.inlineKeyboard([
-                    monitoringButton,
-                    {
-                        text: "🔗 Open on IMDb",
-                        url: `https://www.imdb.com/title/${movieObject.imdbId}/`,
-                    },
+                    [
+                        Markup.button.callback(
+                            "➕ Open Description",
+                            `openDescriptionId${movieObject.id}`
+                        )
+                    ],
+                    [
+                        monitoringButton,
+                        {
+                            text: "🔗 Open on IMDb",
+                            url: `https://www.imdb.com/title/${movieObject.imdbId}/`,
+                        }
+                    ]
                 ]),
             });
         });
 
-        return Promise.resolve(movies);
+        return Promise.resolve({moviesArray: results, messages: movies});
     }
     return;
 }

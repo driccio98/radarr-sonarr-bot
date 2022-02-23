@@ -1,10 +1,13 @@
-import {handleSearch} from "./src/api";
-const { Telegraf, Markup } = require("telegraf");
-const _ = require("lodash");
+import { handleSearch } from "./src/api.js";
+import { Telegraf, Markup } from "telegraf";
+import _ from "lodash";
+import escapeRegExp from "./src/utils/EscapeString.js";
 
 
 const token = "5235453953:AAFoO5vAQx_ukqNELXzjBqkxuxLms89upO0";
 const bot = new Telegraf(token);
+
+//#########################---Commands---##########################
 
 bot.command("start", (ctx) => {
     console.log(ctx.from);
@@ -18,10 +21,15 @@ bot.command("start", (ctx) => {
 
 //let debouncedHandleSearch = _.debounce(handleSearch, 5000, {leading: true, trailing: false})
 
+let currentQuery = [];
 bot.command("search", (ctx) => {
+
     let commandArguments = _.drop(ctx.update.message.text.split(" "), 1).join(" ");
     handleSearch(commandArguments).then((moviesArray) => {
-        moviesArray.map((photoObject) => {
+
+        currentQuery = moviesArray;
+
+        moviesArray.messages.map((photoObject) => {
             if (photoObject.photo) {
                 photoObject.chat_id = ctx.chat.id;
 
@@ -35,11 +43,79 @@ bot.command("search", (ctx) => {
     });
 });
 
+//#########################---Commands---##########################
+
+//#########################---Descriptions---##########################
+
+let openDescriptionRegex = /openDescriptionId[0-9]*/;
+bot.action(openDescriptionRegex, (ctx, next) => {
+
+    if (!currentQuery || currentQuery.length < 1) {
+        return;
+    }
+
+    let currentItemId = ctx.update.callback_query.data.split("Id")[1];
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id === currentItemId; });
+
+    ctx.editMessageCaption(`*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_\nDescription: ${escapeRegExp(movieObject.overview)}`, {
+        parse_mode: "MarkdownV2"
+    });
+
+    let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
+
+    let currentButtonIndex = _.findIndex(replyMarkup[0], function (o) {
+        return openDescriptionRegex.test(o.callback_data);
+    });
+    let newButton = Markup.button.callback(
+        "🛑 Close Description",
+        `closeDescriptionId${movieObject.id}`
+    );
+
+    replyMarkup[0].splice(currentButtonIndex, 1, newButton);
+    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup }).then(() => next())
+
+    return;
+});
+
+let closeDescriptionRegex = /closeDescriptionId[0-9]*/;
+bot.action(closeDescriptionRegex, (ctx, next) => {
+
+    if (!currentQuery || currentQuery.length < 1) {
+        return;
+    }
+
+    let currentItemId = ctx.update.callback_query.data.split("Id")[1];
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id === currentItemId; });
+
+    ctx.editMessageCaption(`*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`, {
+        parse_mode: "MarkdownV2"
+    });
+
+    let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
+
+    let currentButtonIndex = _.findIndex(replyMarkup[0], function (o) {
+        return closeDescriptionRegex.test(o.callback_data);
+    });
+    let newButton = Markup.button.callback(
+        "➕ Open Description",
+        `openDescriptionId${movieObject.id}`
+    )
+
+    replyMarkup[0].splice(currentButtonIndex, 1, newButton);
+    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup }).then(() => next())
+
+    return;
+});
+
+//#########################---Descriptions---##########################
+
+//#########################---Monitoring---##########################
+
 let removeMonitoredRegex = /removeMonitoredId[0-9]*/;
 bot.action(removeMonitoredRegex, (ctx, next) => {
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
-    let monitoringButtonIndex = _.findIndex(replyMarkup[0], function (o) {
+    let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
         return removeMonitoredRegex.test(o.callback_data);
     });
     let newMonitoringButton = Markup.button.callback(
@@ -58,7 +134,7 @@ bot.action(addMonitoredId, (ctx, next) => {
     let replyMarkup =
         ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
-    let monitoringButtonIndex = _.findIndex(replyMarkup[0], function (o) {
+    let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
         return addMonitoredId.test(o.callback_data);
     });
 
@@ -73,8 +149,14 @@ bot.action(addMonitoredId, (ctx, next) => {
     return ctx.reply("Added to Monitored").then(() => next());
 });
 
+//#########################---Monitoring---##########################
+
+//#########################---Bot Process---##########################
+
 bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
+
+//#########################---Bot Process---##########################
