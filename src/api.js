@@ -22,4 +22,15 @@ export default class Api {
         });  
 
     }
+
+    getQualityProfiles(){
+        const apiUrl = `${this.RADARR_URI}qualityProfile?&apiKey=${this.token}`;
+
+        return axios.get(apiUrl).then((response) => {
+            return Promise.resolve(response.data);
+        }).catch((error) => {
+            return Promise.reject(error);
+        }); 
+    }
+
 }

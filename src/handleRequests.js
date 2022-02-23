@@ -64,6 +64,12 @@ export async function handleSearch(searchTerm) {
                             text: "🔗 Open on IMDb",
                             url: `https://www.imdb.com/title/${movieObject.imdbId}/`,
                         }
+                    ],
+                    [
+                        Markup.button.callback(
+                            "👁 Show Quality Profiles",
+                            `showQualityProfilesId${movieObject.id}`
+                        )
                     ]
                 ]),
             });
@@ -72,4 +78,8 @@ export async function handleSearch(searchTerm) {
         return Promise.resolve({moviesArray: results, messages: messagesArray});
     }
     return;
+}
+
+export async function getQualityProfiles(){
+    return await api.getQualityProfiles();
 }

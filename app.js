@@ -1,4 +1,4 @@
-import { handleSearch } from "./src/handleRequests.js";
+import { handleSearch, getQualityProfiles } from "./src/handleRequests.js";
 import { Telegraf, Markup } from "telegraf";
 import _ from "lodash";
 import escapeRegExp from "./src/utils/EscapeString.js";
@@ -57,8 +57,6 @@ bot.action(openDescriptionRegex, (ctx) => {
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    console.log("ctx.update.callback_query.message", ctx.update.callback_query.message)
-
     ctx.editMessageCaption(escapeRegExp(ctx.update.callback_query.message.caption + `\n📙Description: ${movieObject.overview}`), {
         parse_mode: "MarkdownV2"
     });
@@ -74,8 +72,8 @@ bot.action(openDescriptionRegex, (ctx) => {
     );
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
-    
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+    console.log("replyMarkup", replyMarkup);
+    ctx.editMessageReplyMarkup(...Markup.inlineKeyboard([replyMarkup ]));
 
     return;
 });
@@ -111,6 +109,7 @@ bot.action(closeDescriptionRegex, (ctx) => {
     )
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
+    console.log("replyMarkup", replyMarkup);
     ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
 
     return;
@@ -118,10 +117,54 @@ bot.action(closeDescriptionRegex, (ctx) => {
 
 //#########################---Descriptions---##########################
 
+//#########################---Quality Profiles---##########################
+let showQualityProfilesRegex = /showQualityProfilesId[0-9]*/;
+bot.action(showQualityProfilesRegex, async (ctx) => {
+    let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
+
+    let currentItemId = ctx.update.callback_query.data.split("Id")[1];
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
+
+    let currentButtonIndex = _.findIndex(replyMarkup[2], function (o) {
+        return showQualityProfilesRegex.test(o.callback_data);
+    });
+    let newButton = Markup.button.callback(
+        "👁 Hide Quality Profiles",
+        `hideQualityProfilesId${movieObject.id}`
+    )
+    replyMarkup[2].splice(currentButtonIndex, 1, newButton);
+
+    let qualityProfiles = await getQualityProfiles();
+
+    let qualityProfilesButtons = [];
+
+    qualityProfiles.map((qualityProfile) => {
+
+        let qualityProfileName = qualityProfile.id == movieObject.qualityProfileId ?
+        qualityProfile.name + " ✔" :
+        qualityProfile.name
+
+        qualityProfilesButtons.push(Markup.button.callback(
+            `${qualityProfileName}`,
+            `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
+        ));
+        if(qualityProfilesButtons.length > 2){
+            replyMarkup.push(qualityProfilesButtons);
+            qualityProfilesButtons = [];
+        }
+    });
+    
+    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+
+    return;
+});
+
+//#########################---Quality Profiles---##########################
+
 //#########################---Monitoring---##########################
 
 let removeMonitoredRegex = /removeMonitoredId[0-9]*/;
-bot.action(removeMonitoredRegex, (ctx, next) => {
+bot.action(removeMonitoredRegex, (ctx) => {
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
     let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
@@ -135,11 +178,12 @@ bot.action(removeMonitoredRegex, (ctx, next) => {
     replyMarkup[0].splice(monitoringButtonIndex, 1, newMonitoringButton);
     ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
 
-    return ctx.reply("Removed from Monitored").then(() => next());
+    ctx.reply("Removed from Monitored");
+    return;
 });
 
 let addMonitoredId = /addMonitoredId[0-9]*/;
-bot.action(addMonitoredId, (ctx, next) => {
+bot.action(addMonitoredId, (ctx) => {
     let replyMarkup =
         ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
@@ -155,7 +199,8 @@ bot.action(addMonitoredId, (ctx, next) => {
     replyMarkup[0].splice(monitoringButtonIndex, 1, newMonitoringButton);
     ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
 
-    return ctx.reply("Added to Monitored").then(() => next());
+    ctx.reply("Added to Monitored");
+    return
 });
 
 //#########################---Monitoring---##########################
