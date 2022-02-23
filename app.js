@@ -1,4 +1,4 @@
-import { handleSearch } from "./src/api.js";
+import { handleSearch } from "./src/handleRequests.js";
 import { Telegraf, Markup } from "telegraf";
 import _ from "lodash";
 import escapeRegExp from "./src/utils/EscapeString.js";
@@ -48,16 +48,18 @@ bot.command("search", (ctx) => {
 //#########################---Descriptions---##########################
 
 let openDescriptionRegex = /openDescriptionId[0-9]*/;
-bot.action(openDescriptionRegex, (ctx, next) => {
+bot.action(openDescriptionRegex, (ctx) => {
 
     if (!currentQuery || currentQuery.length < 1) {
         return;
     }
 
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
-    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id === currentItemId; });
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    ctx.editMessageCaption(`*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_\nDescription: ${escapeRegExp(movieObject.overview)}`, {
+    console.log("ctx.update.callback_query.message", ctx.update.callback_query.message)
+
+    ctx.editMessageCaption(escapeRegExp(ctx.update.callback_query.message.caption + `\n📙Description: ${movieObject.overview}`), {
         parse_mode: "MarkdownV2"
     });
 
@@ -72,24 +74,31 @@ bot.action(openDescriptionRegex, (ctx, next) => {
     );
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup }).then(() => next())
+    
+    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
 
     return;
 });
 
 let closeDescriptionRegex = /closeDescriptionId[0-9]*/;
-bot.action(closeDescriptionRegex, (ctx, next) => {
+bot.action(closeDescriptionRegex, (ctx) => {
 
     if (!currentQuery || currentQuery.length < 1) {
         return;
     }
 
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
-    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id === currentItemId; });
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    ctx.editMessageCaption(`*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`, {
-        parse_mode: "MarkdownV2"
-    });
+    //Title of movie
+    let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
+    //Ratings
+    caption += escapeRegExp(`\n📈Ratings: ${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} IMDb`);
+    caption += escapeRegExp(` ${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} Rotten Tomatoes`);
+    //Genres
+    caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
+
+    ctx.editMessageCaption(caption, { parse_mode: "MarkdownV2" });
 
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
@@ -102,7 +111,7 @@ bot.action(closeDescriptionRegex, (ctx, next) => {
     )
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup }).then(() => next())
+    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
 
     return;
 });
