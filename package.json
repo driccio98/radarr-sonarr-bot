@@ -1,0 +1,24 @@
+{
+  "name": "radarr-bot",
+  "version": "1.0.0",
+  "description": "A bot for managing radarr (and maybe sonarr) from telegram.",
+  "main": "app.js",
+  "scripts": {
+    "test": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "radarr-sonarr-bot"
+  },
+  "keywords": [
+    "Telegram",
+    "bot"
+  ],
+  "author": "Daniel Riccio",
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "node-fetch": "^3.2.0",
+    "telegraf": "^4.7.0"
+  }
+}
