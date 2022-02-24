@@ -77,4 +77,14 @@ export default class Api {
 
     }
 
+    //Only to change quality profiles and monitored status (for now ;) 
+    editMovie(movieObject){
+        const apiUrl = `${this.RADARR_URI}movie?apiKey=${this.token}`;
+        return axios.put(apiUrl, movieObject).then((response) => {
+            return Promise.resolve(response.data);
+        }).catch((error) => {
+            return Promise.reject(error);
+        });
+    }
+
 }

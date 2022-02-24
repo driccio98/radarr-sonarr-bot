@@ -1,6 +1,5 @@
 
 import { Markup } from "telegraf";
-import { v4 as uuid } from 'uuid';
 import { escapeRegExp, removeRegExp } from "./utils/escapeString.js";
 import _ from "lodash";
 import Api from "./api.js"
@@ -46,7 +45,7 @@ export async function handleSearch(searchTerm) {
 
             //When movies are not in the database they have no id;
             if (!movieObject.id) {
-                movieObject.id = uuid();
+                movieObject.id = Math.floor(Math.random()*90000) + 10000;
             }
 
             //If a quality profile hasn't been selected
@@ -57,7 +56,7 @@ export async function handleSearch(searchTerm) {
             //Set movie's path
             if (!movieObject.path) {
                 movieObject.path =
-                    `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)}(${movieObject.year})`;
+                    `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
             }
 
 
@@ -118,5 +117,5 @@ export async function addNewMovie(movieObject) {
 }
 
 export async function editExistingMovie(movieObject){
-    return await api.editExistingMovie(movieObject);
+    return await api.editMovie(movieObject);
 }

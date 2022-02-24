@@ -134,18 +134,20 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
 
         let qualityProfileName = qualityProfile.name;
         if (qualityProfile.id == movieObject.qualityProfileId) {
-            qualityProfileName = qualityProfile.name + " ✔" 
+            qualityProfileName = qualityProfile.name + " ✔"
         }
-        
+
         qualityProfilesButtons.push(Markup.button.callback(
             `${qualityProfileName}`,
             `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
         ));
+        
         if (qualityProfilesButtons.length > 2) {
             replyMarkup.push(qualityProfilesButtons);
             qualityProfilesButtons = [];
         }
     });
+    console.log("replyMarkup", replyMarkup)
 
     let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
     ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
@@ -182,9 +184,15 @@ bot.action(setQualityProfileRegex, async (ctx) => {
 
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
-    
+
     let selectedQualityProfile = ctx.update.callback_query.data.split("Id")[2]; //We modify the movie object
-    movieObject.qualityProfileId = selectedQualityProfile;                      //With the new quality profile
+    console.log("selectedQualityProfile",selectedQualityProfile)
+    movieObject.qualityProfileId = selectedQualityProfile; //With the new quality profile
+    handleRequests.editExistingMovie(movieObject).catch(error => {
+        console.log(error);
+        ctx.reply("There was an error");
+        return;
+    });                      
 
     replyMarkup.splice(3, replyMarkup.length - 1); //We will replace these with new buttons
 
@@ -195,9 +203,9 @@ bot.action(setQualityProfileRegex, async (ctx) => {
 
         let qualityProfileName = qualityProfile.name;
         if (qualityProfile.id == movieObject.qualityProfileId) {
-            qualityProfileName = qualityProfile.name + " ✔" 
+            qualityProfileName = qualityProfile.name + " ✔"
         }
-        
+
         qualityProfilesButtons.push(Markup.button.callback(
             `${qualityProfileName}`,
             `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
@@ -223,9 +231,20 @@ let removeMonitoredRegex = /removeMonitoredId[0-9]*/;
 bot.action(removeMonitoredRegex, (ctx) => {
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
+    let currentItemId = ctx.update.callback_query.data.split("Id")[1];
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
+
+    movieObject.monitored = false;
+    handleRequests.editExistingMovie(movieObject).catch(error => {
+        console.log(error);
+        ctx.reply("There was an error");
+        return;
+    });
+
     let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
         return removeMonitoredRegex.test(o.callback_data);
     });
+
     let newMonitoringButton = Markup.button.callback(
         "🛑 Unmonitored",
         "addMonitoredId"
@@ -239,17 +258,30 @@ bot.action(removeMonitoredRegex, (ctx) => {
     return;
 });
 
-let addMonitoredId = /addMonitoredId[0-9]*/;
-bot.action(addMonitoredId, (ctx) => {
+let addMonitoredRegex = /addMonitoredId[0-9]*/;
+bot.action(addMonitoredRegex, (ctx) => {
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    handleRequests.addNewMovie(movieObject).catch(error => console.log(error));
+    if (!movieObject.path && movieObject.path.length < 1) { //Is the movie already in the database
+        handleRequests.addNewMovie(movieObject).catch(error => {
+            console.log(error);
+            ctx.reply("There was an error");
+            return;
+        });
+    } else {
+        movieObject.monitored = true;
+        handleRequests.editExistingMovie(movieObject).catch(error => {
+            console.log(error);
+            ctx.reply("There was an error");
+            return;
+        });
+    }
 
     let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
-        return addMonitoredId.test(o.callback_data);
+        return addMonitoredRegex.test(o.callback_data);
     });
 
     let newMonitoringButton = Markup.button.callback(
