@@ -1,20 +1,22 @@
 
 import { Markup } from "telegraf";
 import { v4 as uuid } from 'uuid';
-import escapeRegExp from "./utils/EscapeString.js";
+import { escapeRegExp, removeRegExp } from "./utils/escapeString.js";
 import _ from "lodash";
 import Api from "./api.js"
 
 const RADARR_APIKEY = "e4e7e0e212044fbdbbccc837a1a3bfba";
 const api = new Api(RADARR_APIKEY);
 
+const MOVIES_ROOT_FOLDER = "/home/lix/Jellyfin/media/Movies/"
+
 export function getCaption(movieObject, long = true) {
 
     //Title of movie
     let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
     //Ratings
-    caption += escapeRegExp(`\n📈Ratings: ${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} IMDb🟨`);
-    caption += escapeRegExp(` ${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} Rotten Tomatoes🍅`);
+    caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} 🟨IMDb`);
+    caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} 🍅Rotten Tomatoes`);
     //Genres
     caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
     //Is it downloaded
@@ -31,16 +33,33 @@ export function getCaption(movieObject, long = true) {
 export async function handleSearch(searchTerm) {
     if (searchTerm && searchTerm.length > 0) {
 
-        let results = await api.moviesLookup(searchTerm);
+        let results = await api.getMoviesByTerm(searchTerm);
 
         //we sort the results by year of release
         let sortedResults = _.sortBy(results, [function (o) { return o.year; }])
 
         let messagesArray = [];
+
+        let defaultQualityProfileId = 4;
+
         sortedResults.map((movieObject) => {
 
             //When movies are not in the database they have no id;
-            if (!movieObject.id) { movieObject.id = uuid(); }
+            if (!movieObject.id) {
+                movieObject.id = uuid();
+            }
+
+            //If a quality profile hasn't been selected
+            if (!movieObject.qualityProfileId) {
+                movieObject.qualityProfileId = defaultQualityProfileId;
+            }
+
+            //Set movie's path
+            if (!movieObject.path) {
+                movieObject.path =
+                    `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)}(${movieObject.year})`;
+            }
+
 
             let monitoringButton;
             if (movieObject.monitored) {
@@ -92,4 +111,12 @@ export async function handleSearch(searchTerm) {
 
 export async function getQualityProfiles() {
     return await api.getQualityProfiles();
+}
+
+export async function addNewMovie(movieObject) {
+    return await api.addNewMovie(movieObject);
+}
+
+export async function editExistingMovie(movieObject){
+    return await api.editExistingMovie(movieObject);
 }
