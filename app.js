@@ -1,7 +1,6 @@
-import { handleSearch, getQualityProfiles } from "./src/handleRequests.js";
+import { handleSearch, getQualityProfiles, getCaption } from "./src/handleRequests.js";
 import { Telegraf, Markup } from "telegraf";
 import _ from "lodash";
-import escapeRegExp from "./src/utils/EscapeString.js";
 
 
 const token = "5235453953:AAFoO5vAQx_ukqNELXzjBqkxuxLms89upO0";
@@ -57,10 +56,6 @@ bot.action(openDescriptionRegex, (ctx) => {
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    ctx.editMessageCaption(escapeRegExp(ctx.update.callback_query.message.caption + `\n📙Description: ${movieObject.overview}`), {
-        parse_mode: "MarkdownV2"
-    });
-
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
     let currentButtonIndex = _.findIndex(replyMarkup[0], function (o) {
@@ -72,8 +67,10 @@ bot.action(openDescriptionRegex, (ctx) => {
     );
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
-    console.log("replyMarkup", replyMarkup);
-    ctx.editMessageReplyMarkup(...Markup.inlineKeyboard([replyMarkup ]));
+    ctx.editMessageCaption(getCaption(movieObject, true), { //We get the long caption
+        parse_mode: "MarkdownV2",
+        ...Markup.inlineKeyboard(replyMarkup)
+    });
 
     return;
 });
@@ -88,16 +85,6 @@ bot.action(closeDescriptionRegex, (ctx) => {
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    //Title of movie
-    let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
-    //Ratings
-    caption += escapeRegExp(`\n📈Ratings: ${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} IMDb`);
-    caption += escapeRegExp(` ${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} Rotten Tomatoes`);
-    //Genres
-    caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
-
-    ctx.editMessageCaption(caption, { parse_mode: "MarkdownV2" });
-
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
     let currentButtonIndex = _.findIndex(replyMarkup[0], function (o) {
@@ -109,8 +96,11 @@ bot.action(closeDescriptionRegex, (ctx) => {
     )
 
     replyMarkup[0].splice(currentButtonIndex, 1, newButton);
-    console.log("replyMarkup", replyMarkup);
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+    let caption = getCaption(movieObject, false); //We get the short caption
+    ctx.editMessageCaption(caption, {
+        parse_mode: "MarkdownV2",
+        ...Markup.inlineKeyboard(replyMarkup)
+    });
 
     return;
 });
@@ -141,20 +131,44 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
     qualityProfiles.map((qualityProfile) => {
 
         let qualityProfileName = qualityProfile.id == movieObject.qualityProfileId ?
-        qualityProfile.name + " ✔" :
-        qualityProfile.name
+            qualityProfile.name + " ✔" :
+            qualityProfile.name
 
         qualityProfilesButtons.push(Markup.button.callback(
             `${qualityProfileName}`,
             `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
         ));
-        if(qualityProfilesButtons.length > 2){
+        if (qualityProfilesButtons.length > 2) {
             replyMarkup.push(qualityProfilesButtons);
             qualityProfilesButtons = [];
         }
     });
-    
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+
+    let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
+    ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
+
+    return;
+});
+
+let hideQualityProfilesRegex = /hideQualityProfilesId[0-9]*/;
+bot.action(hideQualityProfilesRegex, async (ctx) => {
+    let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
+
+    let currentItemId = ctx.update.callback_query.data.split("Id")[1];
+    let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
+
+    let currentButtonIndex = _.findIndex(replyMarkup[2], function (o) {
+        return hideQualityProfilesRegex.test(o.callback_data);
+    });
+    let newButton = Markup.button.callback(
+        "👁 Show Quality Profiles",
+        `showQualityProfilesId${movieObject.id}`
+    )
+    replyMarkup[2].splice(currentButtonIndex, 1, newButton); //We always know where this button is
+    replyMarkup.splice(3, replyMarkup.length - 1); //And we always know where this row of buttons opens
+
+    let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
+    ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
 
     return;
 });
@@ -176,7 +190,8 @@ bot.action(removeMonitoredRegex, (ctx) => {
     );
 
     replyMarkup[0].splice(monitoringButtonIndex, 1, newMonitoringButton);
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+    let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
+    ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
 
     ctx.reply("Removed from Monitored");
     return;
@@ -197,7 +212,8 @@ bot.action(addMonitoredId, (ctx) => {
     );
 
     replyMarkup[0].splice(monitoringButtonIndex, 1, newMonitoringButton);
-    ctx.editMessageReplyMarkup({ inline_keyboard: replyMarkup });
+    let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
+    ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
 
     ctx.reply("Added to Monitored");
     return

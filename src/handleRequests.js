@@ -8,14 +8,34 @@ import Api from "./api.js"
 const RADARR_APIKEY = "e4e7e0e212044fbdbbccc837a1a3bfba";
 const api = new Api(RADARR_APIKEY);
 
+export function getCaption(movieObject, long = true) {
+
+    //Title of movie
+    let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
+    //Ratings
+    caption += escapeRegExp(`\n📈Ratings: ${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} IMDb🟨`);
+    caption += escapeRegExp(` ${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} Rotten Tomatoes🍅`);
+    //Genres
+    caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
+    //Is it downloaded
+    caption += escapeRegExp(`\n🚩Downloaded: ${movieObject.hasFile ? "Yes" : "No"}`);
+
+    if (long) {
+        caption += escapeRegExp(`\n📙Description: ${movieObject.overview}`);
+    }
+
+    return caption;
+
+}
+
 export async function handleSearch(searchTerm) {
     if (searchTerm && searchTerm.length > 0) {
-        
+
         let results = await api.moviesLookup(searchTerm);
 
         //we sort the results by year of release
-        let sortedResults = _.sortBy(results,[function(o) { return o.year; }])
-        
+        let sortedResults = _.sortBy(results, [function (o) { return o.year; }])
+
         let messagesArray = [];
         sortedResults.map((movieObject) => {
 
@@ -34,18 +54,8 @@ export async function handleSearch(searchTerm) {
                     `addMonitoredId${movieObject.id}`
                 );
             }
-            //Title of movie
-            let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
-            
-            //Ratings
-            caption += escapeRegExp(`\n📈Ratings: ${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} IMDb`);
-            caption += escapeRegExp(` ${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} Rotten Tomatoes`);
-            
-            //Genres
-            caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
 
-            //Is it downloaded
-            caption += escapeRegExp(`\n🚩Downloaded: ${movieObject.hasFile ? "Yes": "No"}`);
+            let caption = getCaption(movieObject, false);
 
             messagesArray.push({
                 id: movieObject.id,
@@ -75,11 +85,11 @@ export async function handleSearch(searchTerm) {
             });
         });
 
-        return Promise.resolve({moviesArray: results, messages: messagesArray});
+        return Promise.resolve({ moviesArray: results, messages: messagesArray });
     }
     return;
 }
 
-export async function getQualityProfiles(){
+export async function getQualityProfiles() {
     return await api.getQualityProfiles();
 }
