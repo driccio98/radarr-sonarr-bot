@@ -2,10 +2,13 @@
 import { Markup } from "telegraf";
 import { escapeRegExp, removeRegExp, bytesToSize } from "./utils/utils.js";
 import _ from "lodash";
-import Api from "./api.js"
+import radarrApi from "./apiRadarr.js"
+import omdbApi from "./apiOmdb.js";
 
 const RADARR_APIKEY = "e4e7e0e212044fbdbbccc837a1a3bfba";
-const api = new Api(RADARR_APIKEY);
+const apiRadarr = new radarrApi(RADARR_APIKEY);
+const OMDB_APIKEY = "16401af2"
+const apiOmdb = new omdbApi(OMDB_APIKEY);
 
 const MOVIES_ROOT_FOLDER = "/home/lix/Jellyfin/media/Movies/"
 
@@ -40,7 +43,7 @@ export function getCaption(movieObject, long = true) {
 export async function handleSearch(searchTerm) {
     if (searchTerm && searchTerm.length > 0) {
 
-        let results = await api.getMoviesByTerm(searchTerm);
+        let results = await apiRadarr.getMoviesByTerm(searchTerm);
 
         //we sort the results by year of release
         let sortedResults = _.sortBy(results, [function (o) { return o.year; }])
@@ -66,7 +69,6 @@ export async function handleSearch(searchTerm) {
                 movieObject.path =
                     `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
             }
-
 
             let monitoringButton;
             if (movieObject.monitored) {
@@ -117,20 +119,20 @@ export async function handleSearch(searchTerm) {
 }
 
 export async function getQualityProfiles() {
-    return await api.getQualityProfiles();
+    return await apiRadarr.getQualityProfiles();
 }
 
 export async function addNewMovie(movieObject) {
-    return await api.addNewMovie(movieObject);
+    return await apiRadarr.addNewMovie(movieObject);
 }
 
 export async function editExistingMovie(movieObject) {
-    return await api.editMovie(movieObject);
+    return await apiRadarr.editMovie(movieObject);
 }
 
 export async function getMonitoredMovies() {
 
-    let results = await api.getAllMovies();
+    let results = await apiRadarr.getAllMovies();
     let monitoredMovies = results.filter(item => item.monitored);
 
     //we sort the results by year of release
@@ -157,7 +159,6 @@ export async function getMonitoredMovies() {
             movieObject.path =
                 `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
         }
-
 
         let monitoringButton;
         if (movieObject.monitored) {
@@ -205,4 +206,10 @@ export async function getMonitoredMovies() {
 
     return Promise.resolve({ moviesArray: results, messages: messagesArray });
 
+}
+
+export async function searchMovieByImdbId(imdbId){
+    let result = await apiOmdb.getMovieFromImdbId(imdbId);
+
+    return handleSearch(result.Title);
 }

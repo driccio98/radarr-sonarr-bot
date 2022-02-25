@@ -1,17 +1,17 @@
 import axios from "axios";
 import _ from "lodash";
 
-export default class Api {
+export default class radarrApi {
     constructor(token) {
         this.token = token;
 
-        this.RADARR_URI = "https://daniflix.ddns.net/radarr/api/v3/";
+        this.requestUrl = "https://daniflix.ddns.net/radarr/api/v3/";
 
         this.INVALID_PARAMS = new Error("The parameters passed to this method are invalid");
     }
     //Getters
     getAllMovies() {
-        const apiUrl = `${this.RADARR_URI}movie?apiKey=${this.token}`;
+        const apiUrl = `${this.requestUrl}movie?apiKey=${this.token}`;
         return axios.get(apiUrl).then((response) => {
             return Promise.resolve(response.data);
         }).catch((error) => {
@@ -34,7 +34,7 @@ export default class Api {
             return Promise.reject(this.INVALID_PARAMS);
         }
 
-        const apiUrl = `${this.RADARR_URI}movie/lookup?term=${searchTerm}&apiKey=${this.token}`;
+        const apiUrl = `${this.requestUrl}movie/lookup?term=${searchTerm}&apiKey=${this.token}`;
         return axios.get(apiUrl).then((response) => {
             return Promise.resolve(response.data);
         }).catch((error) => {
@@ -44,7 +44,7 @@ export default class Api {
     }
 
     getQualityProfiles() {
-        const apiUrl = `${this.RADARR_URI}qualityProfile?&apiKey=${this.token}`;
+        const apiUrl = `${this.requestUrl}qualityProfile?&apiKey=${this.token}`;
 
         return axios.get(apiUrl).then((response) => {
             return Promise.resolve(response.data);
@@ -64,7 +64,7 @@ export default class Api {
             movieObject.id = id + 1;
             movieObject.monitored = true;
 
-            const apiUrl = `${this.RADARR_URI}movie?apiKey=${this.token}`;
+            const apiUrl = `${this.requestUrl}movie?apiKey=${this.token}`;
             return axios.post(apiUrl, movieObject).then((response) => {
                 return Promise.resolve(response.data);
             }).catch((error) => {
@@ -79,7 +79,7 @@ export default class Api {
 
     //Only to change quality profiles and monitored status (for now ;) 
     editMovie(movieObject){
-        const apiUrl = `${this.RADARR_URI}movie?apiKey=${this.token}`;
+        const apiUrl = `${this.requestUrl}movie?apiKey=${this.token}`;
         return axios.put(apiUrl, movieObject).then((response) => {
             return Promise.resolve(response.data);
         }).catch((error) => {
