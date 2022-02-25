@@ -1,6 +1,6 @@
 
 import { Markup } from "telegraf";
-import { escapeRegExp, removeRegExp } from "./utils/escapeString.js";
+import { escapeRegExp, removeRegExp, bytesToSize } from "./utils/utils.js";
 import _ from "lodash";
 import Api from "./api.js"
 
@@ -14,12 +14,20 @@ export function getCaption(movieObject, long = true) {
     //Title of movie
     let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
     //Ratings
-    caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ? movieObject.ratings.imdb.value : "0"} 🟨IMDb`);
-    caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ? movieObject.ratings.rottenTomatoes.value : "0"} 🍅Rotten Tomatoes`);
+    caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ?
+        movieObject.ratings.imdb.value : "0"} 🟨IMDb`);
+    caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ?
+        movieObject.ratings.rottenTomatoes.value : "0"} 🍅Rotten Tomatoes`);
     //Genres
     caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
+    //Youtube trailer
+    if (movieObject.youTubeTrailerId && movieObject.youTubeTrailerId.length > 0) {
+        caption +=
+            `\n[▶Play Trailer](https://www.youtube.com/watch?v=${movieObject.youTubeTrailerId})`;
+    }
     //Is it downloaded
-    caption += escapeRegExp(`\n🚩Downloaded: ${movieObject.hasFile ? "Yes" : "No"}`);
+    caption += escapeRegExp(`\n🚩Downloaded: ${movieObject.hasFile ? 
+        `Yes Size: ${bytesToSize(movieObject.sizeOnDisk)}` : "No"}`);
 
     if (long) {
         caption += escapeRegExp(`\n📙Description: ${movieObject.overview}`);
@@ -45,7 +53,7 @@ export async function handleSearch(searchTerm) {
 
             //When movies are not in the database they have no id;
             if (!movieObject.id) {
-                movieObject.id = Math.floor(Math.random()*90000) + 10000;
+                movieObject.id = Math.floor(Math.random() * 90000) + 10000;
             }
 
             //If a quality profile hasn't been selected
@@ -82,9 +90,9 @@ export async function handleSearch(searchTerm) {
                 ...Markup.inlineKeyboard([
                     [
                         Markup.button.callback(
-                            "➕ Open Description",
+                            "➕ View Description",
                             `openDescriptionId${movieObject.id}`
-                        )
+                        ),
                     ],
                     [
                         monitoringButton,
@@ -116,6 +124,85 @@ export async function addNewMovie(movieObject) {
     return await api.addNewMovie(movieObject);
 }
 
-export async function editExistingMovie(movieObject){
+export async function editExistingMovie(movieObject) {
     return await api.editMovie(movieObject);
+}
+
+export async function getMonitoredMovies() {
+
+    let results = await api.getAllMovies();
+    let monitoredMovies = results.filter(item => item.monitored);
+
+    //we sort the results by year of release
+    let sortedResults = _.orderBy(monitoredMovies, ["year"],["desc"]);
+
+    let messagesArray = [];
+    
+    let defaultQualityProfileId = 4;
+
+    sortedResults.map((movieObject) => {
+
+        //When movies are not in the database they have no id;
+        if (!movieObject.id) {
+            movieObject.id = Math.floor(Math.random() * 90000) + 10000;
+        }
+
+        //If a quality profile hasn't been selected
+        if (!movieObject.qualityProfileId) {
+            movieObject.qualityProfileId = defaultQualityProfileId;
+        }
+
+        //Set movie's path
+        if (!movieObject.path) {
+            movieObject.path =
+                `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
+        }
+
+
+        let monitoringButton;
+        if (movieObject.monitored) {
+            monitoringButton = Markup.button.callback(
+                "✔ Monitored",
+                `removeMonitoredId${movieObject.id}`
+            );
+        } else {
+            monitoringButton = Markup.button.callback(
+                "🛑 Unmonitored",
+                `addMonitoredId${movieObject.id}`
+            );
+        }
+
+        let caption = getCaption(movieObject, false);
+        let poster = movieObject.images.find(item => item.coverType === "poster");
+
+        messagesArray.push({
+            id: movieObject.id,
+            photo: poster.remoteUrl || "",
+            caption,
+            ...Markup.inlineKeyboard([
+                [
+                    Markup.button.callback(
+                        "➕ View Description",
+                        `openDescriptionId${movieObject.id}`
+                    ),
+                ],
+                [
+                    monitoringButton,
+                    {
+                        text: "🔗 Open on IMDb",
+                        url: `https://www.imdb.com/title/${movieObject.imdbId}/`,
+                    }
+                ],
+                [
+                    Markup.button.callback(
+                        "👁 Show Quality Profiles",
+                        `showQualityProfilesId${movieObject.id}`
+                    )
+                ]
+            ]),
+        });
+    });
+
+    return Promise.resolve({ moviesArray: results, messages: messagesArray });
+
 }

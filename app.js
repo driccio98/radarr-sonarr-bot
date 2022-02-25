@@ -6,24 +6,41 @@ import _ from "lodash";
 const token = "5235453953:AAFoO5vAQx_ukqNELXzjBqkxuxLms89upO0";
 const bot = new Telegraf(token);
 
+//#########################---Utils---##########################
+
+function replaceMarkupButton(replyMarkup, rowIndex, columnIndex, itemToReplace){
+    let newReplyMarkup = _.cloneDeep(replyMarkup);
+    newReplyMarkup[rowIndex].splice(columnIndex, 1, itemToReplace);
+    return newReplyMarkup;
+}
+
+//#########################---Utils---##########################
+
 //#########################---Commands---##########################
 
 bot.command("start", (ctx) => {
     console.log(ctx.from);
     bot.telegram.sendMessage(
         ctx.chat.id,
-        "hello there! Welcome to my new telegram bot.",
-        {}
+        "Hello there!\\, This is Radarr bot\\!",
+        {
+            parse_mode: "MarkdownV2"
+        }
     );
 });
-
-
-//let debouncedHandleSearch = _.debounce(handleSearch, 5000, {leading: true, trailing: false})
 
 let currentQuery = [];
 bot.command("search", (ctx) => {
 
     let commandArguments = _.drop(ctx.update.message.text.split(" "), 1).join(" ");
+
+    if(!commandArguments){
+        return ctx.reply("Please enter a search term e.g `/search the batman`",
+        {
+            parse_mode: "MarkdownV2"
+        });
+    }
+
     handleRequests.handleSearch(commandArguments).then((moviesArray) => {
 
         currentQuery = moviesArray; //Save the query temporarily 
@@ -42,6 +59,26 @@ bot.command("search", (ctx) => {
     });
 });
 
+bot.command("viewMonitored", (ctx) => {
+
+    handleRequests.getMonitoredMovies().then((requestResult) => {
+        currentQuery = requestResult;
+
+        requestResult.messages.map((photoObject) => {
+            if (photoObject.photo) {
+                photoObject.chat_id = ctx.chat.id;
+
+                bot.telegram.sendPhoto(photoObject.chat_id, photoObject.photo, {
+                    caption: photoObject.caption.slice(0, 1024),
+                    parse_mode: "MarkdownV2",
+                    reply_markup: photoObject.reply_markup,
+                });
+            }
+        });
+    });
+
+});
+
 //#########################---Commands---##########################
 
 //#########################---Descriptions---##########################
@@ -56,19 +93,17 @@ bot.action(openDescriptionRegex, (ctx) => {
     let currentItemId = ctx.update.callback_query.data.split("Id")[1];
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-    console.log("movieObject", movieObject);
-
     let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
 
     let currentButtonIndex = _.findIndex(replyMarkup[0], function (o) {
         return openDescriptionRegex.test(o.callback_data);
     });
     let newButton = Markup.button.callback(
-        "🛑 Close Description",
+        "🛑 Hide Description",
         `closeDescriptionId${movieObject.id}`
     );
 
-    replyMarkup[0].splice(currentButtonIndex, 1, newButton);
+    replyMarkup = replaceMarkupButton(replyMarkup, 0, currentButtonIndex, newButton);
     ctx.editMessageCaption(handleRequests.getCaption(movieObject, true), { //We get the long caption
         parse_mode: "MarkdownV2",
         ...Markup.inlineKeyboard(replyMarkup)
@@ -93,11 +128,11 @@ bot.action(closeDescriptionRegex, (ctx) => {
         return closeDescriptionRegex.test(o.callback_data);
     });
     let newButton = Markup.button.callback(
-        "➕ Open Description",
+        "➕ View Description",
         `openDescriptionId${movieObject.id}`
     )
-
-    replyMarkup[0].splice(currentButtonIndex, 1, newButton);
+    
+    replyMarkup = replaceMarkupButton(replyMarkup, 0, currentButtonIndex, newButton);
     let caption = handleRequests.getCaption(movieObject, false); //We get the short caption
     ctx.editMessageCaption(caption, {
         parse_mode: "MarkdownV2",
@@ -124,7 +159,7 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
         "👁 Hide Quality Profiles",
         `hideQualityProfilesId${movieObject.id}`
     )
-    replyMarkup[2].splice(currentButtonIndex, 1, newButton);
+    replyMarkup = replaceMarkupButton(replyMarkup, 2, currentButtonIndex, newButton);
 
     let qualityProfiles = await handleRequests.getQualityProfiles();
 
@@ -147,7 +182,6 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
             qualityProfilesButtons = [];
         }
     });
-    console.log("replyMarkup", replyMarkup)
 
     let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
     ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
@@ -169,7 +203,7 @@ bot.action(hideQualityProfilesRegex, async (ctx) => {
         "👁 Show Quality Profiles",
         `showQualityProfilesId${movieObject.id}`
     )
-    replyMarkup[2].splice(currentButtonIndex, 1, newButton); //We always know where this button is
+    replyMarkup = replaceMarkupButton(replyMarkup, 2, currentButtonIndex, newButton); //We always know where this button is
     replyMarkup.splice(3, replyMarkup.length - 1); //And we always know where this row of buttons opens
 
     let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
@@ -186,7 +220,7 @@ bot.action(setQualityProfileRegex, async (ctx) => {
     let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
     let selectedQualityProfile = ctx.update.callback_query.data.split("Id")[2]; //We modify the movie object
-    console.log("selectedQualityProfile",selectedQualityProfile)
+
     movieObject.qualityProfileId = selectedQualityProfile; //With the new quality profile
     handleRequests.editExistingMovie(movieObject).catch(error => {
         console.log(error);
@@ -241,16 +275,17 @@ bot.action(removeMonitoredRegex, (ctx) => {
         return;
     });
 
-    let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
+    let currentButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
         return removeMonitoredRegex.test(o.callback_data);
     });
 
-    let newMonitoringButton = Markup.button.callback(
+    let newButton = Markup.button.callback(
         "🛑 Unmonitored",
         "addMonitoredId"
     );
 
-    replyMarkup[1].splice(monitoringButtonIndex, 1, newMonitoringButton);
+    replyMarkup = replaceMarkupButton(replyMarkup, 1, currentButtonIndex, newButton);
+    
     let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
     ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
 
@@ -280,16 +315,16 @@ bot.action(addMonitoredRegex, (ctx) => {
         });
     }
 
-    let monitoringButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
+    let currentButtonIndex = _.findIndex(replyMarkup[1], function (o) { //following the replyMarkup array of arrays
         return addMonitoredRegex.test(o.callback_data);
     });
 
-    let newMonitoringButton = Markup.button.callback(
+    let newButton = Markup.button.callback(
         "✔ Monitored",
         "removeMonitoredId"
     );
 
-    replyMarkup[1].splice(monitoringButtonIndex, 1, newMonitoringButton);
+    replyMarkup = replaceMarkupButton(replyMarkup, 1, currentButtonIndex, newButton);
     let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
     ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
 
