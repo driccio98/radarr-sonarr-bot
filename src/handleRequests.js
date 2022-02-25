@@ -20,7 +20,7 @@ export function getCaption(movieObject, long = true) {
     caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ?
         movieObject.ratings.imdb.value : "0"} 🟨IMDb`);
     caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ?
-        movieObject.ratings.rottenTomatoes.value : "0"} 🍅Rotten Tomatoes`);
+        movieObject.ratings.rottenTomatoes.value : "0"} 🍅RT`);
     //Genres
     caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
     //Youtube trailer
