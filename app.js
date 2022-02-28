@@ -345,7 +345,6 @@ function sendPathSelector(ctx) {
         let keyboardButtons = [];
         handleRequests.getPaths()
             .then(rootFolders => {
-                console.log("rootFolders", rootFolders)
                 if (rootFolders < 1) {
                     return reject("No folder paths");
                 }
