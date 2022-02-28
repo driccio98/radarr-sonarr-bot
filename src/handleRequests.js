@@ -1,6 +1,6 @@
 
 import { Markup } from "telegraf";
-import { escapeRegExp, removeRegExp, bytesToSize } from "./utils/utils.js";
+import { escapeRegExp, bytesToSize } from "./utils/utils.js";
 import _ from "lodash";
 import radarrApi from "./apiRadarr.js"
 import omdbApi from "./apiOmdb.js";
@@ -10,17 +10,15 @@ const apiRadarr = new radarrApi(RADARR_APIKEY);
 const OMDB_APIKEY = "16401af2"
 const apiOmdb = new omdbApi(OMDB_APIKEY);
 
-const MOVIES_ROOT_FOLDER = "/home/lix/Jellyfin/media/Movies/"
-
 export function getCaption(movieObject, long = true) {
 
     //Title of movie
     let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
     //Ratings
     caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ?
-        movieObject.ratings.imdb.value : "0"} 🟨IMDb`);
+        movieObject.ratings.imdb.value : "0"} 🟨 IMDb`);
     caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ?
-        movieObject.ratings.rottenTomatoes.value : "0"} 🍅RT`);
+        movieObject.ratings.rottenTomatoes.value : "0"} 🍅 RT`);
     //Genres
     caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
     //Youtube trailer
@@ -64,11 +62,11 @@ export async function handleSearch(searchTerm) {
                 movieObject.qualityProfileId = defaultQualityProfileId;
             }
 
-            //Set movie's path
+            /*//Set movie's path
             if (!movieObject.path) {
                 movieObject.path =
                     `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
-            }
+            }*/
 
             let monitoringButton;
             if (movieObject.monitored) {
@@ -155,10 +153,10 @@ export async function getMonitoredMovies() {
         }
 
         //Set movie's path
-        if (!movieObject.path) {
+        /*if (!movieObject.path) {
             movieObject.path =
                 `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
-        }
+        }*/
 
         let monitoringButton;
         if (movieObject.monitored) {
@@ -212,4 +210,8 @@ export async function searchMovieByImdbId(imdbId){
     let result = await apiOmdb.getMovieFromImdbId(imdbId);
 
     return handleSearch(result.Title);
+}
+
+export async function getPaths() {
+    return await apiRadarr.getPaths();
 }

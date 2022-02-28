@@ -87,4 +87,14 @@ export default class radarrApi {
         });
     }
 
+    //Get root folder paths
+    getPaths(){
+        const apiUrl = `${this.requestUrl}rootFolder?apiKey=${this.token}`;
+        return axios.get(apiUrl).then((response) => {
+            return Promise.resolve(response.data);
+        }).catch((error) => {
+            return Promise.reject(error);
+        });
+    }
+
 }

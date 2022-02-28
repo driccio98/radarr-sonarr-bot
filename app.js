@@ -21,7 +21,7 @@ function replaceMarkupButton(replyMarkup, rowIndex, columnIndex, itemToReplace) 
 bot.command("start", (ctx) => {
     bot.telegram.sendMessage(
         ctx.chat.id,
-        "Hello there!\\, This is Radarr bot\\!",
+        "Hello there\\!, This is Radarr bot\\!",
         {
             parse_mode: "MarkdownV2"
         }
@@ -177,7 +177,7 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
                 `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
             ));
 
-            if (qualityProfilesButtons.length > 2) {
+            if (qualityProfilesButtons.length > 1) {
                 replyMarkup.push(qualityProfilesButtons);
                 qualityProfilesButtons = [];
             }
@@ -314,11 +314,15 @@ bot.action(addMonitoredRegex, (ctx) => {
         let currentItemId = ctx.update.callback_query.data.split("Id")[1];
         let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
 
-        if (!movieObject.path && movieObject.path.length < 1) { //Is the movie already in the database
-            handleRequests.addNewMovie(movieObject).catch(error => {
-                handleError(error, ctx);
-                return;
+        if (!movieObject.path || movieObject.path.length < 1) { //Is the movie already in the database
+            sendPathSelector(ctx).then((selectedPath) => {
+                movieObject.path = selectedPath;
+                handleRequests.addNewMovie(movieObject).catch(error => {
+                    handleError(error, ctx);
+                    return;
+                });
             });
+            return;
         } else {
             movieObject.monitored = true;
             handleRequests.editExistingMovie(movieObject).catch(error => {
@@ -346,6 +350,34 @@ bot.action(addMonitoredRegex, (ctx) => {
         handleError(error, ctx);
     }
 });
+
+function sendPathSelector(ctx) {
+    let keyboardButtons = [];
+    return handleRequests.getPaths()
+        .then(rootFolders => {
+            console.log("rootFolders", rootFolders)
+            if (rootFolders < 1) {
+                return Promise.reject("No folder paths");
+            }
+            rootFolders.map(rootFolder => {
+                keyboardButtons.push({
+                    text: rootFolder.path
+                })
+            })
+            let keyboard = Markup.keyboard(keyboardButtons);
+            ctx.reply("Please select a path", keyboard);
+            
+            bot.on('message', (context) => {
+                context.reply("Path Selected",
+                    {
+                        reply_markup: JSON.stringify({
+                            hide_keyboard: true
+                        })
+                    })
+                return Promise.resolve(context.update.message.text);
+            });
+        })
+}
 
 //#########################---Monitoring---##########################
 
