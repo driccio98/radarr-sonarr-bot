@@ -1,4 +1,5 @@
 import * as handleRequests from "./src/handleRequests.js";
+import { removeRegExp } from "./src/utils/utils.js";
 import { Telegraf, Markup } from "telegraf";
 import _ from "lodash";
 
@@ -144,6 +145,34 @@ bot.action(closeDescriptionRegex, (ctx) => {
 //#########################---Descriptions---##########################
 
 //#########################---Quality Profiles---##########################
+
+async function getQualityProfilesKeyboard(movieObject, replyMarkup) {
+    let newMarkup = _.cloneDeep(replyMarkup);
+
+    let qualityProfiles = await handleRequests.getQualityProfiles();
+    let qualityProfilesButtons = [];
+
+    qualityProfiles.map((qualityProfile, index) => {
+
+        let qualityProfileName = qualityProfile.name;
+        if (qualityProfile.id == movieObject.qualityProfileId) {
+            qualityProfileName = qualityProfile.name + " ✔"
+        }
+
+        qualityProfilesButtons.push(Markup.button.callback(
+            `${qualityProfileName}`,
+            `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
+        ));
+
+        if (qualityProfilesButtons.length > 1 ||
+            (index === qualityProfiles.length - 1 && qualityProfilesButtons.length > 0)) {
+            newMarkup.push(qualityProfilesButtons);
+            qualityProfilesButtons = [];
+        }
+    });
+    return newMarkup;
+}
+
 let showQualityProfilesRegex = /showQualityProfilesId[0-9]*/;
 bot.action(showQualityProfilesRegex, async (ctx) => {
     try {
@@ -161,30 +190,8 @@ bot.action(showQualityProfilesRegex, async (ctx) => {
         )
         replyMarkup = replaceMarkupButton(replyMarkup, 2, currentButtonIndex, newButton);
 
-        let qualityProfiles = await handleRequests.getQualityProfiles();
-
-        let qualityProfilesButtons = [];
-
-        qualityProfiles.map((qualityProfile) => {
-
-            let qualityProfileName = qualityProfile.name;
-            if (qualityProfile.id == movieObject.qualityProfileId) {
-                qualityProfileName = qualityProfile.name + " ✔"
-            }
-
-            qualityProfilesButtons.push(Markup.button.callback(
-                `${qualityProfileName}`,
-                `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
-            ));
-
-            if (qualityProfilesButtons.length > 1) {
-                replyMarkup.push(qualityProfilesButtons);
-                qualityProfilesButtons = [];
-            }
-        });
-
-        let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
-        ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
+        let newReplyMarkup = await getQualityProfilesKeyboard(movieObject, replyMarkup);
+        ctx.editMessageReplyMarkup(Markup.inlineKeyboard(newReplyMarkup).reply_markup);
 
         return;
     } catch (error) {
@@ -230,35 +237,18 @@ bot.action(setQualityProfileRegex, async (ctx) => {
         let selectedQualityProfile = ctx.update.callback_query.data.split("Id")[2]; //We modify the movie object
 
         movieObject.qualityProfileId = selectedQualityProfile; //With the new quality profile
-        handleRequests.editExistingMovie(movieObject).catch(error => {
-            handleError(error, ctx);
-            return;
-        });
+
+        if (movieObject.path) { //We need to check that the movie already exists
+            handleRequests.editExistingMovie(movieObject).catch(error => {
+                handleError(error, ctx);
+                return;
+            });
+        }
 
         replyMarkup.splice(3, replyMarkup.length - 1); //We will replace these with new buttons
 
-        let qualityProfiles = await handleRequests.getQualityProfiles();
-        let qualityProfilesButtons = [];
-
-        qualityProfiles.map((qualityProfile) => {
-
-            let qualityProfileName = qualityProfile.name;
-            if (qualityProfile.id == movieObject.qualityProfileId) {
-                qualityProfileName = qualityProfile.name + " ✔"
-            }
-
-            qualityProfilesButtons.push(Markup.button.callback(
-                `${qualityProfileName}`,
-                `setQualityProfileId${movieObject.id}Id${qualityProfile.id}`
-            ));
-            if (qualityProfilesButtons.length > 2) {
-                replyMarkup.push(qualityProfilesButtons);
-                qualityProfilesButtons = [];
-            }
-        });
-
-        let newReplyMarkup = Markup.inlineKeyboard(replyMarkup);
-        ctx.editMessageReplyMarkup(newReplyMarkup.reply_markup);
+        let newReplyMarkup = await getQualityProfilesKeyboard(movieObject, replyMarkup);
+        ctx.editMessageReplyMarkup(Markup.inlineKeyboard(newReplyMarkup).reply_markup);
 
         return;
     } catch (error) {
@@ -316,13 +306,12 @@ bot.action(addMonitoredRegex, (ctx) => {
 
         if (!movieObject.path || movieObject.path.length < 1) { //Is the movie already in the database
             sendPathSelector(ctx).then((selectedPath) => {
-                movieObject.path = selectedPath;
+                movieObject.path = `${selectedPath}${removeRegExp(movieObject.title)} (${movieObject.year})`;
                 handleRequests.addNewMovie(movieObject).catch(error => {
                     handleError(error, ctx);
                     return;
                 });
             });
-            return;
         } else {
             movieObject.monitored = true;
             handleRequests.editExistingMovie(movieObject).catch(error => {
@@ -352,31 +341,33 @@ bot.action(addMonitoredRegex, (ctx) => {
 });
 
 function sendPathSelector(ctx) {
-    let keyboardButtons = [];
-    return handleRequests.getPaths()
-        .then(rootFolders => {
-            console.log("rootFolders", rootFolders)
-            if (rootFolders < 1) {
-                return Promise.reject("No folder paths");
-            }
-            rootFolders.map(rootFolder => {
-                keyboardButtons.push({
-                    text: rootFolder.path
-                })
-            })
-            let keyboard = Markup.keyboard(keyboardButtons);
-            ctx.reply("Please select a path", keyboard);
-            
-            bot.on('message', (context) => {
-                context.reply("Path Selected",
-                    {
-                        reply_markup: JSON.stringify({
-                            hide_keyboard: true
-                        })
+    return new Promise((resolve, reject) => {
+        let keyboardButtons = [];
+        handleRequests.getPaths()
+            .then(rootFolders => {
+                console.log("rootFolders", rootFolders)
+                if (rootFolders < 1) {
+                    return reject("No folder paths");
+                }
+                rootFolders.map(rootFolder => {
+                    keyboardButtons.push({
+                        text: rootFolder.path
                     })
-                return Promise.resolve(context.update.message.text);
-            });
-        })
+                })
+                let keyboard = Markup.keyboard(keyboardButtons);
+                ctx.reply("Please select a path", keyboard);
+
+                bot.on('message', (context) => {
+                    context.reply("Path Selected",
+                        {
+                            reply_markup: JSON.stringify({
+                                hide_keyboard: true
+                            })
+                        })
+                    return resolve(context.update.message.text);
+                });
+            })
+    })
 }
 
 //#########################---Monitoring---##########################

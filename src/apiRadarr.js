@@ -96,5 +96,4 @@ export default class radarrApi {
             return Promise.reject(error);
         });
     }
-
 }
