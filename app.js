@@ -9,6 +9,7 @@ const bot = new Telegraf(token);
 
 //#########################---Utils---##########################
 
+//the keyboard is a matrix of buttons
 function replaceMarkupButton(replyMarkup, rowIndex, columnIndex, itemToReplace) {
     let newReplyMarkup = _.cloneDeep(replyMarkup);
     newReplyMarkup[rowIndex].splice(columnIndex, 1, itemToReplace);
@@ -53,6 +54,8 @@ bot.command("search", (ctx) => {
                 });
             }
         });
+    }).catch(error => {
+        handleError(error, ctx);
     });
 });
 
@@ -72,6 +75,33 @@ bot.command("viewMonitored", (ctx) => {
             }
         });
     });
+});
+
+bot.on('message', (context) => {
+    let imdbIdRegex = /tt[0-9]{1,}/
+    let message = context.update.message.text;
+    let imdbId = message.match(imdbIdRegex);
+
+    if(imdbId && imdbId.length > 0){
+        //only the first match
+        handleRequests.searchMovieByImdbId(imdbId[0]).then((moviesArray) => {
+            currentQuery = moviesArray; //Save the query temporarily 
+            moviesArray.messages.map((photoObject) => {
+                if (photoObject.photo) {
+                    photoObject.chat_id = context.chat.id;
+    
+                    bot.telegram.sendPhoto(photoObject.chat_id, photoObject.photo, {
+                        caption: photoObject.caption.slice(0, 1024),
+                        parse_mode: "MarkdownV2",
+                        reply_markup: photoObject.reply_markup,
+                    });
+                }
+            });
+        }).catch(error => {
+            handleError(error, context);
+        });
+    }
+    
 });
 
 //#########################---Commands---##########################
