@@ -15,23 +15,23 @@ export function getCaption(movieObject, long = true) {
     //Title of movie
     let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
     //Ratings
-    caption += escapeRegExp(`\n📈Ratings:\n${movieObject.ratings.imdb ?
-        movieObject.ratings.imdb.value : "0"} 🟨 IMDb`);
-    caption += escapeRegExp(`\n${movieObject.ratings.rottenTomatoes ?
-        movieObject.ratings.rottenTomatoes.value : "0"} 🍅 RT`);
+    caption += `\n*Ratings*\\: ${movieObject.ratings.imdb ?
+        movieObject.ratings.imdb.value : "0"} IMDb \\🟨`;
+    caption += ` ${movieObject.ratings.rottenTomatoes ?
+        movieObject.ratings.rottenTomatoes.value : "0"} RT \\🍅`;
     //Genres
-    caption += escapeRegExp(`\n🎭Genres: ${movieObject.genres.join(", ")}`);
+    caption += `\n*Genres*: ${escapeRegExp(movieObject.genres.join(", "))}`;
     //Youtube trailer
     if (movieObject.youTubeTrailerId && movieObject.youTubeTrailerId.length > 0) {
         caption +=
-            `\n[▶Play Trailer](https://www.youtube.com/watch?v=${movieObject.youTubeTrailerId})`;
+            `\n[Play Trailer🔗](https://www.youtube.com/watch?v=${movieObject.youTubeTrailerId})`;
     }
     //Is it downloaded
-    caption += escapeRegExp(`\n🚩Downloaded: ${movieObject.hasFile ? 
-        `Yes Size: ${bytesToSize(movieObject.sizeOnDisk)}` : "No"}`);
+    caption += `\n*Downloaded*: ${movieObject.hasFile ?
+        `Yes Size\\: ${bytesToSize(movieObject.sizeOnDisk)}` : "No"}`;
 
     if (long) {
-        caption += escapeRegExp(`\n📙Description: ${movieObject.overview}`);
+        caption += `\n*Description*: ${escapeRegExp(movieObject.overview)}`;
     }
 
     return caption;
@@ -42,32 +42,27 @@ export async function handleSearch(searchTerm) {
     if (searchTerm && searchTerm.length > 0) {
 
         let results = await apiRadarr.getMoviesByTerm(searchTerm);
-
+        if (!results || results.length < 1) {
+            return Promise.reject("Nothing found");
+        }
         //we sort the results by year of release
         let sortedResults = _.sortBy(results, [function (o) { return o.year; }])
-
         let messagesArray = [];
-
         let defaultQualityProfileId = 4;
-
         sortedResults.map((movieObject) => {
-
             //When movies are not in the database they have no id;
             if (!movieObject.id) {
                 movieObject.id = Math.floor(Math.random() * 90000) + 10000;
             }
-
             //If a quality profile hasn't been selected
             if (!movieObject.qualityProfileId) {
                 movieObject.qualityProfileId = defaultQualityProfileId;
             }
-
             /*//Set movie's path
             if (!movieObject.path) {
                 movieObject.path =
                     `${MOVIES_ROOT_FOLDER}${removeRegExp(movieObject.title)} (${movieObject.year})`;
             }*/
-
             let monitoringButton;
             if (movieObject.monitored) {
                 monitoringButton = Markup.button.callback(
@@ -113,7 +108,7 @@ export async function handleSearch(searchTerm) {
 
         return Promise.resolve({ moviesArray: results, messages: messagesArray });
     }
-    return;
+    return Promise.reject("Empty Search Term");
 }
 
 export async function getQualityProfiles() {
@@ -134,10 +129,10 @@ export async function getMonitoredMovies() {
     let monitoredMovies = results.filter(item => item.monitored);
 
     //we sort the results by year of release
-    let sortedResults = _.orderBy(monitoredMovies, ["year"],["desc"]);
+    let sortedResults = _.orderBy(monitoredMovies, ["year"], ["desc"]);
 
     let messagesArray = [];
-    
+
     let defaultQualityProfileId = 4;
 
     sortedResults.map((movieObject) => {
@@ -206,10 +201,13 @@ export async function getMonitoredMovies() {
 
 }
 
-export async function searchMovieByImdbId(imdbId){
+export async function searchMovieByImdbId(imdbId) {
     let result = await apiOmdb.getMovieFromImdbId(imdbId);
 
-    return handleSearch(result.Title);
+    if (result.Type === "movie") {
+        return handleSearch(`${result.Title} ${result.Year}`);
+    }
+    return Promise.reject("Nothing found")
 }
 
 export async function getPaths() {
