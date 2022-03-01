@@ -76,19 +76,16 @@ bot.command("viewMonitored", (ctx) => {
         });
     });
 });
-
-bot.on('message', (context) => {
-    let imdbIdRegex = /tt[0-9]{1,}/
-    let message = context.update.message.text;
-    let imdbId = message.match(imdbIdRegex);
-
+let imdbIdRegex = /tt[0-9]{1,}/
+bot.hears(imdbIdRegex, (ctx) => {
+    let imdbId = ctx.update.message.text.match(imdbIdRegex);
     if(imdbId && imdbId.length > 0){
         //only the first match
         handleRequests.searchMovieByImdbId(imdbId[0]).then((moviesArray) => {
             currentQuery = moviesArray; //Save the query temporarily 
             moviesArray.messages.map((photoObject) => {
                 if (photoObject.photo) {
-                    photoObject.chat_id = context.chat.id;
+                    photoObject.chat_id = ctx.chat.id;
     
                     bot.telegram.sendPhoto(photoObject.chat_id, photoObject.photo, {
                         caption: photoObject.caption.slice(0, 1024),
@@ -98,10 +95,9 @@ bot.on('message', (context) => {
                 }
             });
         }).catch(error => {
-            handleError(error, context);
+            handleError(error, ctx);
         });
     }
-    
 });
 
 //#########################---Commands---##########################
@@ -330,10 +326,11 @@ let addMonitoredRegex = /addMonitoredId[0-9]*/;
 bot.action(addMonitoredRegex, (ctx) => {
     try {
         let replyMarkup = ctx.update.callback_query.message.reply_markup.inline_keyboard;
-
         let currentItemId = ctx.update.callback_query.data.split("Id")[1];
         let movieObject = _.find(currentQuery.moviesArray, function (o) { return o.id == currentItemId; });
-
+        
+        console.log("movieObject", movieObject);
+        
         if (!movieObject.path || movieObject.path.length < 1) { //Is the movie already in the database
             sendPathSelector(ctx).then((selectedPath) => {
                 movieObject.path = `${selectedPath}${removeRegExp(movieObject.title)} (${movieObject.year})`;
@@ -382,11 +379,13 @@ function sendPathSelector(ctx) {
                     keyboardButtons.push({
                         text: rootFolder.path
                     })
-                })
+                });
+                keyboardButtons.push({text: "Cancel"});
                 let keyboard = Markup.keyboard(keyboardButtons);
                 ctx.reply("Please select a path", keyboard);
-
-                bot.on('message', (context) => {
+                
+                let pathRegex = /^\/|(\/[\w-]+)+$/
+                bot.hears(pathRegex, (context) => {
                     context.reply("Path Selected",
                         {
                             reply_markup: JSON.stringify({

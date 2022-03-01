@@ -16,9 +16,9 @@ export function getCaption(movieObject, long = true) {
     let caption = `*${escapeRegExp(movieObject.title)}* \\- _${movieObject.year}_`;
     //Ratings
     caption += `\n*Ratings*\\: ${movieObject.ratings.imdb ?
-        movieObject.ratings.imdb.value : "0"} IMDb \\🟨`;
+        movieObject.ratings.imdb.value : "0"} IMDb 🟨`;
     caption += ` ${movieObject.ratings.rottenTomatoes ?
-        movieObject.ratings.rottenTomatoes.value : "0"} RT \\🍅`;
+        movieObject.ratings.rottenTomatoes.value : "0"} RT 🍅`;
     //Genres
     caption += `\n*Genres*: ${escapeRegExp(movieObject.genres.join(", "))}`;
     //Youtube trailer
